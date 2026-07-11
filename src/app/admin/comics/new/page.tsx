@@ -18,36 +18,85 @@ export default function NewComicPage() {
   const [pageFiles, setPageFiles] = useState<FileList | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [statusMsg, setStatusMsg] = useState("");
 
   if (status === "unauthenticated" || (status === "authenticated" && !user?.isAdmin)) {
     router.push("/");
     return null;
   }
 
+  async function uploadFile(supabaseUrl: string, key: string, serviceRoleKey: string, bucket: string, file: File) {
+    const res = await fetch(`${supabaseUrl}/storage/v1/object/${bucket}/${key}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": file.type || "application/octet-stream",
+        "x-upsert": "true",
+      },
+      body: file,
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Upload failed (${res.status}): ${text}`);
+    }
+    return `${supabaseUrl}/storage/v1/object/public/${bucket}/${key}`;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !price) return;
     setSubmitting(true);
+    setStatusMsg("Fetching upload config...");
 
     try {
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("description", description);
-      formData.append("series", series);
-      formData.append("issueNumber", issueNumber);
-      formData.append("price", price);
-      formData.append("previewPages", previewPages);
-      if (coverFile) formData.append("cover", coverFile);
-      if (pdfFile) formData.append("pdf", pdfFile);
+      const configRes = await fetch("/api/admin/comics/upload-config");
+      if (!configRes.ok) throw new Error("Failed to get upload config");
+      const { supabaseUrl, serviceRoleKey, bucket } = await configRes.json();
+
+      const comicId = crypto.randomUUID();
+      const uploadHeaders: Record<string, string> = {};
+
+      if (coverFile) {
+        setStatusMsg("Uploading cover image...");
+        const ext = coverFile.name.split(".").pop() || "jpg";
+        await uploadFile(supabaseUrl, `${comicId}/cover.${ext}`, serviceRoleKey, bucket, coverFile);
+        uploadHeaders.coverImage = `${supabaseUrl}/storage/v1/object/public/${bucket}/${comicId}/cover.${ext}`;
+      }
+
+      let pdfUrl = null;
+      if (pdfFile && pdfFile.size > 0) {
+        setStatusMsg(`Uploading PDF (${(pdfFile.size / 1024 / 1024).toFixed(1)}MB)...`);
+        pdfUrl = await uploadFile(supabaseUrl, `${comicId}/comic.pdf`, serviceRoleKey, bucket, pdfFile);
+      }
+
+      const pageUrls: { pageNumber: number; imageUrl: string }[] = [];
       if (pageFiles && !pdfFile) {
         for (let i = 0; i < pageFiles.length; i++) {
-          formData.append("pages", pageFiles[i]);
+          const file = pageFiles[i];
+          const ext = file.name.split(".").pop() || "jpg";
+          setStatusMsg(`Uploading page ${i + 1}/${pageFiles.length}...`);
+          const url = await uploadFile(supabaseUrl, `${comicId}/pages/page-${String(i + 1).padStart(3, "0")}.${ext}`, serviceRoleKey, bucket, file);
+          pageUrls.push({ pageNumber: i + 1, imageUrl: url });
         }
       }
 
+      setStatusMsg("Saving comic...");
+
       const res = await fetch("/api/admin/comics/create", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          comicId,
+          title,
+          description,
+          series,
+          issueNumber,
+          price,
+          previewPages,
+          coverImage: uploadHeaders.coverImage || "",
+          pdfFile: pdfUrl,
+          pages: pageUrls,
+        }),
       });
 
       if (res.ok) {
@@ -56,10 +105,11 @@ export default function NewComicPage() {
         const data = await res.json();
         alert(data.error || "Failed to create comic");
       }
-    } catch {
-      alert("Failed to create comic");
+    } catch (err: any) {
+      alert(err.message || "Failed to create comic");
     } finally {
       setSubmitting(false);
+      setStatusMsg("");
     }
   };
 
@@ -184,7 +234,7 @@ export default function NewComicPage() {
           disabled={submitting}
           className="w-full bg-blue-600 text-white font-medium py-2.5 rounded text-sm hover:bg-blue-700 transition disabled:opacity-50 font-mono"
         >
-          {submitting ? "Uploading..." : "Create Comic"}
+          {submitting ? (statusMsg || "Uploading...") : "Create Comic"}
         </button>
       </form>
     </div>

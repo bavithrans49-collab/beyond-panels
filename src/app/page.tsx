@@ -4,16 +4,10 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  let comics: any[] = [];
-  let error = null;
-  try {
-    comics = await prisma.comic.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 6,
-    });
-  } catch (e: any) {
-    error = e.message || String(e);
-  }
+  const comics = await prisma.comic.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 6,
+  });
 
   return (
     <div>
@@ -61,14 +55,7 @@ export default async function HomePage() {
           <div className="h-1 flex-1 bg-comic-red" />
         </div>
 
-        {error ? (
-          <div className="text-center py-16">
-            <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded max-w-xl mx-auto">
-              <p className="font-bold mb-2">Database Error</p>
-              <p className="text-sm">{error}</p>
-            </div>
-          </div>
-        ) : comics.length === 0 ? (
+        {comics.length === 0 ? (
           <div className="text-center py-16">
             <div className="speech-bubble inline-block px-8 py-4 text-lg font-heading">
               No comics yet — stay tuned!
