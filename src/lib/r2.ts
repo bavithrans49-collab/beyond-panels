@@ -1,67 +1,53 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+const SUPABASE_URL = `https://${process.env.SUPABASE_PROJECT_REF!}.supabase.co`;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "beyond-panels";
 
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || "";
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || "";
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || "beyond-panels";
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
+const STORAGE_URL = `${SUPABASE_URL}/storage/v1`;
+const PUBLIC_URL = `${STORAGE_URL}/object/public/${BUCKET}`;
 
-const r2Client = new S3Client({
-  region: "auto",
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
-});
-
-function buildKey(comicId: string, filename: string) {
-  return `${comicId}/${filename}`;
+async function supabaseFetch(path: string, options: RequestInit = {}) {
+  const res = await fetch(`${STORAGE_URL}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      ...options.headers,
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Supabase Storage error ${res.status}: ${text}`);
+  }
+  return res;
 }
 
 export async function uploadToR2(comicId: string, filename: string, buffer: Buffer, contentType: string) {
-  const key = buildKey(comicId, filename);
-  await r2Client.send(
-    new PutObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-    })
-  );
-  return r2PublicUrl(key);
+  const key = `${comicId}/${filename}`;
+  await supabaseFetch(`/object/${BUCKET}/${key}`, {
+    method: "POST",
+    body: new Uint8Array(buffer),
+    headers: { "Content-Type": contentType },
+  });
+  return `${PUBLIC_URL}/${key}`;
 }
 
 export async function deleteFromR2(comicId: string, filename: string) {
-  const key = buildKey(comicId, filename);
-  await r2Client.send(
-    new DeleteObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: key,
-    })
-  );
+  const key = `${comicId}/${filename}`;
+  await supabaseFetch(`/object/${BUCKET}`, {
+    method: "DELETE",
+    body: JSON.stringify({ prefixes: [key] }),
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 export async function deleteKeysFromR2(keys: string[]) {
   if (keys.length === 0) return;
-  await r2Client.send(
-    new DeleteObjectsCommand({
-      Bucket: R2_BUCKET_NAME,
-      Delete: { Objects: keys.map((k) => ({ Key: k })) },
-    })
-  );
+  await supabaseFetch(`/object/${BUCKET}`, {
+    method: "DELETE",
+    body: JSON.stringify({ prefixes: keys }),
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
-export async function getPresignedUrl(comicId: string, filename: string, expiresIn = 3600) {
-  const key = buildKey(comicId, filename);
-  const command = new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key });
-  return getSignedUrl(r2Client, command, { expiresIn });
-}
-
-export function r2PublicUrl(key: string) {
-  if (R2_PUBLIC_URL) {
-    return `${R2_PUBLIC_URL}/${key}`;
-  }
-  return `https://${R2_BUCKET_NAME}.r2.dev/${key}`;
+export async function getPublicUrl(comicId: string, filename: string) {
+  return `${PUBLIC_URL}/${comicId}/${filename}`;
 }

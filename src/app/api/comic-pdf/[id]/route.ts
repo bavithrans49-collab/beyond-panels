@@ -2,21 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || "";
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || "";
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || "beyond-panels";
-
-const r2Client = new S3Client({
-  region: "auto",
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
-});
 
 export async function GET(
   req: Request,
@@ -43,13 +28,19 @@ export async function GET(
 
   try {
     const pdfKey = `${id}/comic.pdf`;
-    const command = new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: pdfKey });
-    const response = await r2Client.send(command);
-    const body = await response.Body?.transformToByteArray();
+    const storageUrl = `https://${process.env.SUPABASE_PROJECT_REF}.supabase.co/storage/v1/object/${process.env.SUPABASE_STORAGE_BUCKET || "beyond-panels"}/${pdfKey}`;
 
-    if (!body) return NextResponse.json({ error: "File not found" }, { status: 404 });
+    const res = await fetch(storageUrl, {
+      headers: {
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
 
-    return new Response(Buffer.from(body), {
+    if (!res.ok) return NextResponse.json({ error: "File not found" }, { status: 404 });
+
+    const buffer = await res.arrayBuffer();
+
+    return new Response(buffer, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": "inline",
