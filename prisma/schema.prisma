@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(uuid())
+  name      String
+  email     String     @unique
+  password  String
+  isAdmin   Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  purchases Purchase[]
+  reviews   Review[]
+  cartItems CartItem[]
+}
+
+model Comic {
+  id           String     @id @default(uuid())
+  title        String
+  description  String
+  series       String?
+  issueNumber  Int?
+  price        Int
+  coverImage   String     @default("")
+  previewPages Int        @default(3)
+  pdfFile      String?
+  createdAt    DateTime   @default(now())
+  pages        ComicPage[]
+  purchases    Purchase[]
+  reviews      Review[]
+  cartItems    CartItem[]
+}
+
+model ComicPage {
+  id        String @id @default(uuid())
+  comicId   String
+  pageNumber Int
+  imageUrl   String
+  comic     Comic  @relation(fields: [comicId], references: [id], onDelete: Cascade)
+}
+
+model Purchase {
+  id        String   @id @default(uuid())
+  userId    String
+  comicId   String
+  buyerName String
+  amount    Int
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  comic     Comic    @relation(fields: [comicId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  comicId   String
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  comic     Comic    @relation(fields: [comicId], references: [id])
+}
+
+model CartItem {
+  id        String @id @default(uuid())
+  userId    String
+  comicId   String
+  user      User   @relation(fields: [userId], references: [id])
+  comic     Comic  @relation(fields: [comicId], references: [id])
+}
+
+model VerificationCode {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  verified  Boolean  @default(false)
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

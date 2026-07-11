@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Inter:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-heroic-blue: #1C3D5B;
+  --color-comic-red: #D32F2F;
+  --color-golden-yellow: #F5C518;
+  --color-vintage-paper: #F5F0E8;
+  --color-ink-black: #1A1A1A;
+  --font-heading: 'Playfair Display', serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-vintage-paper);
+  color: var(--color-ink-black);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+}
+
+.halftone-bg {
+  background-image:
+    radial-gradient(circle, rgba(28, 61, 91, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.comic-panel {
+  border: 3px solid var(--color-ink-black);
+  box-shadow: 6px 6px 0px var(--color-heroic-blue);
+}
+
+.comic-badge {
+  font-family: var(--font-heading);
+  background: var(--color-golden-yellow);
+  color: var(--color-ink-black);
+  border: 2px solid var(--color-ink-black);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble {
+  position: relative;
+  background: white;
+  border: 3px solid var(--color-ink-black);
+  border-radius: 20px;
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -20px;
+  left: 30px;
+  border-width: 20px 20px 0;
+  border-style: solid;
+  border-color: var(--color-ink-black) transparent;
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0); }
+  80% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.pop-in {
+  animation: pop-in 0.3s ease-out;
+}
