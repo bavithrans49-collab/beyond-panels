@@ -4,10 +4,23 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const comics = await prisma.comic.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 6,
-  });
+  let comics: any[] = [];
+  try {
+    comics = await prisma.comic.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 6,
+    });
+  } catch (e: any) {
+    console.error("Homepage DB error:", e);
+    return (
+      <div className="max-w-xl mx-auto py-20 px-4">
+        <div className="bg-red-50 border border-red-300 rounded p-6">
+          <h2 className="text-red-800 font-bold mb-2">Database Error</h2>
+          <p className="text-red-700 text-sm font-mono break-all">{e.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
