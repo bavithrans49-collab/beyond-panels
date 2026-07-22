@@ -1,0 +1,203 @@
+============================================================
+  BEYOND PANELS — VERCEL DEPLOYMENT GUIDE
+============================================================
+
+1. GITHUB REPO
+------------------------------------------------------------
+   URL:  https://github.com/bavithrans49-collab/beyond-panels
+   Branch: main
+
+   To push changes from local:
+     git add -A
+     git commit -m "your message"
+     git push
+
+
+2. VERCEL PROJECT
+------------------------------------------------------------
+   Dashboard:  https://vercel.com/dashboard
+   Org:        bavithrans49-collab
+   Project:    beyond-panels
+   Framework:  Next.js 16.2.10 (Turbopack)
+
+   To redeploy:
+     Vercel Dashboard → Deployments → "..." menu → Redeploy
+     (Always clear build cache if something breaks)
+
+
+3. VERCEL — DEPLOYMENT PROTECTION (IMPORTANT!)
+------------------------------------------------------------
+   If your site asks visitors to sign in to Vercel:
+
+     Vercel Dashboard
+       → Project
+         → Settings
+           → Deployment Protection
+             → Vercel Authentication
+               → Set to "Don't require authentication"
+             → Save
+
+   This allows anyone to visit your site without Vercel login.
+
+
+4. VERCEL — ENVIRONMENT VARIABLES
+------------------------------------------------------------
+   Vercel Dashboard → Project → Settings → Environment Variables
+
+   All of these MUST be set. The .env file is NOT uploaded to Vercel.
+   Vercel has its own separate copy.
+
+   ┌──────────────────────────┬──────────────────────────────────────────────────────┐
+   │ Variable                 │ Value                                                │
+   ├──────────────────────────┼──────────────────────────────────────────────────────┤
+   │ DATABASE_URL             │ postgresql://postgres.hrtgrzrvdyvbkzjawvnl:         │
+   │                          │   Koz3KQUnSoDMP7EF@aws-0-ap-northeast-1.            │
+   │                          │   pooler.supabase.com:6543/postgres?pgbouncer=true  │
+   ├──────────────────────────┼──────────────────────────────────────────────────────┤
+   │ NEXTAUTH_URL             │ https://beyond-panels-XXXXX-username.vercel.app     │
+   │                          │ (Use YOUR actual Vercel deployment URL)             │
+   ├──────────────────────────┼──────────────────────────────────────────────────────┤
+   │ NEXTAUTH_SECRET          │ beyond-panels-super-secret-key-change-in-production │
+   ├──────────────────────────┼──────────────────────────────────────────────────────┤
+   │ GMAIL_USER               │ bavithrans49@gmail.com                               │
+   ├──────────────────────────┼──────────────────────────────────────────────────────┤
+   │ GMAIL_APP_PASSWORD       │ fqob kngs tsdc aeei                                  │
+   ├──────────────────────────┼──────────────────────────────────────────────────────┤
+   │ RAZORPAY_KEY_ID          │ rzp_test_xxxxxxxxxxxx                                │
+   ├──────────────────────────┼──────────────────────────────────────────────────────┤
+   │ RAZORPAY_KEY_SECRET      │ your_test_secret_here                                │
+   ├──────────────────────────┼──────────────────────────────────────────────────────┤
+   │ SUPABASE_PROJECT_REF     │ hrtgrzrvdyvbkzjawvnl                                 │
+   ├──────────────────────────┼──────────────────────────────────────────────────────┤
+   │ SUPABASE_SERVICE_ROLE_KEY│ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc...      │
+   │                          │ (full JWT token from Supabase dashboard)            │
+   ├──────────────────────────┼──────────────────────────────────────────────────────┤
+   │ SUPABASE_STORAGE_BUCKET  │ beyond-panels                                        │
+   └──────────────────────────┴──────────────────────────────────────────────────────┘
+
+   IMPORTANT NOTES:
+   - DATABASE_URL uses the POOLER URL (port 6543) with ?pgbouncer=true
+   - Do NOT use the direct URL (port 5432) — it will fail from Vercel
+   - NEXTAUTH_URL must match your actual Vercel URL exactly (https://...)
+   - After changing env vars, you MUST redeploy
+
+
+5. SUPABASE PROJECT
+------------------------------------------------------------
+   Dashboard:  https://supabase.com/dashboard/project/hrtgrzrvdyvbkzjawvnl
+   Region:     ap-northeast-1 (Singapore)
+
+   Database (PostgreSQL):
+     Connection Pooler URL (for Vercel):
+       postgresql://postgres.hrtgrzrvdyvbkzjawvnl:PASSWORD
+         @aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres
+
+     Direct Connection URL (for local dev):
+       postgresql://postgres:Koz3KQUnSoDMP7EF
+         @db.hrtgrzrvdyvbkzjawvnl.supabase.co:5432/postgres
+
+   Storage:
+     Bucket: beyond-panels
+     Type:   PUBLIC
+     Limit:  50 MB per file
+
+   Tables (7 total):
+     - Comic
+     - User
+     - Purchase
+     - Review
+     - VerificationCode
+     - CartItem
+     - ComicPage
+
+   After schema changes:
+     npx prisma db push
+     npx prisma db seed    (creates admin user)
+
+
+6. LOCAL DEVELOPMENT
+------------------------------------------------------------
+   .env file is used for local dev only.
+   Vercel uses its own env vars (see section 4).
+
+   Commands:
+     npm run dev          Start dev server (http://localhost:3000)
+     npm run build        Build for production
+     npx prisma db push   Push schema to database
+     npx prisma db seed   Seed admin user
+     npx prisma generate  Regenerate Prisma client
+
+
+7. ADMIN LOGIN
+------------------------------------------------------------
+   Email:    bavithrans49@gmail.com
+   Password: 25233001
+
+   Admin panel:  /admin
+   Add comics:   /admin/comics/new
+
+
+8. HOW FILE UPLOADS WORK
+------------------------------------------------------------
+   Files upload DIRECTLY from the browser to Supabase Storage,
+   bypassing Vercel's 4.5MB body size limit.
+
+   Flow:
+     1. Admin page requests upload config from /api/admin/comics/upload-config
+     2. Server returns Supabase URL, bucket name, and service role key
+     3. Browser uploads cover image + PDF directly to Supabase Storage
+     4. Browser sends just the URLs/metadata to /api/admin/comics/create
+     5. Server saves the comic record in the database
+
+   Files stored at:
+     - {comicId}/cover.{ext}      (cover image)
+     - {comicId}/comic.pdf         (PDF file)
+     - {comicId}/pages/page-001.ext (individual pages, if no PDF)
+
+
+9. PAYMENT (QR CODE)
+------------------------------------------------------------
+   QR image location:  public/qr/phonepe.png
+   If using JPEG, update the code in:
+     - src/app/comic/[id]/client.tsx
+     - src/app/checkout/page.tsx
+
+
+10. TROUBLESHOOTING
+------------------------------------------------------------
+   PROBLEM: "A server error occurred" on homepage
+   FIX:     Check DATABASE_URL in Vercel env vars.
+            Must be the pooler URL with ?pgbouncer=true
+
+   PROBLEM: "This page couldn't load" on homepage
+   FIX:     Make sure all env vars are set in Vercel.
+            Redeploy after any env var change.
+
+   PROBLEM: Vercel asks to sign in
+   FIX:     Vercel → Settings → Deployment Protection
+            → Set to "Don't require authentication"
+
+   PROBLEM: Comic upload fails ("Failed to create comic")
+   FIX:     Check browser console (F12) for exact error.
+            Make sure Supabase Storage bucket exists and is PUBLIC.
+
+   PROBLEM: Supabase database can't connect
+   FIX:     Check if project is paused (free tier pauses after 7 days).
+            Unpause from Supabase dashboard.
+
+   PROBLEM: "prepared statement already exists" error
+   FIX:     Use pooler URL with ?pgbouncer=true (see section 4)
+
+   PROBLEM: Build fails with Prisma error
+   FIX:     Make sure "postinstall": "prisma generate" is in package.json
+
+
+============================================================
+  CURRENT DEPLOYMENT URLS
+============================================================
+   Vercel Preview:  beyond-panels-rr8g-mq57aa6s0-bavithran.vercel.app
+                    (or beyond-panels-qtpeckzks-bavithran.vercel.app)
+   GitHub Repo:     github.com/bavithrans49-collab/beyond-panels
+   Supabase:        supabase.com/dashboard/project/hrtgrzrvdyvbkzjawvnl
+
+============================================================
